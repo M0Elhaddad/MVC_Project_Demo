@@ -1,0 +1,172 @@
+﻿@model ItemStore
+@{
+    ViewData["Title"] = "Home Page";
+    var store = new SelectList(ViewData["Store"] as IEnumerable<Store>, nameof(Store.Id), nameof(Store.Name));
+    var item = new SelectList(ViewData["Item"] as IEnumerable<Item>, nameof(Item.Id), nameof(Item.Name));
+}
+<h1>Store Item</h1>
+<br />
+<br />
+<form asp-action="Index">
+    <div asp-validation-summary="ModelOnly"></div>
+
+    <div class="form-group">
+        <label class="col-form-label" asp-for="Store"></label>
+        <select id="storeSelect" class="form-control" asp-for="StoreId" asp-items="@store">
+            <option value="@null"> -- Select Store -- </option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="col-form-label" asp-for="Item"></label>
+        <select id="itemSelect" class="form-control" asp-for="ItemId" asp-items="@item" disabled>
+            <option value="@null"> -- Select Item -- </option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="col-form-label" asp-for="Quantity"></label>
+        <input id="quantityInput" asp-for="Quantity" class="form-control" disabled />
+        <span asp-validation-for="Quantity" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label class="col-form-label" asp-for="Balance"></label>
+        <input id="balanceInput" asp-for="Balance" class="form-control" readonly />
+    </div>
+
+    <input type="submit" value="Save" class="btn btn-primary" />
+</form>
+
+@section Scripts {
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.6.0.min.js"></script>
+
+    <script>
+
+
+        $(document).ready(function () {
+            // Disable item, quantity inputs, and save button initially
+            $('#itemSelect').prop('disabled', true);
+            $('#quantityInput').prop('disabled', true);
+            $('input[type="submit"]').prop('disabled', true); // Disable the save button initially
+
+            // Enable item select when a store is selected
+            $('#storeSelect').change(function () {
+                if ($(this).val()) {
+                    $('#itemSelect').prop('disabled', false);
+                } else {
+                    $('#itemSelect').prop('disabled', true);
+                    $('#quantityInput').prop('disabled', true);
+                    $('#balanceInput').val('');
+                    $('input[type="submit"]').prop('disabled', true); // Disable save button
+                }
+            });
+
+            // Fetch quantity and balance when item is selected
+            $('#itemSelect').change(function () {
+                var storeId = $('#storeSelect').val();
+                var itemId = $(this).val();
+
+                if (itemId && storeId) {
+                    $.ajax({
+                        url: '@Url.Action("GetItemStoreDetails", "Home")', // Specify the action and controller
+                        type: 'GET',
+                        data: { storeId: storeId, itemId: itemId },
+                        success: function (data) {
+                            // Enable the Quantity input regardless of whether data exists
+                            $('#quantityInput').prop('disabled', false);
+                            if (data) {
+                                $('#quantityInput').val(data.quantity);
+                                $('#balanceInput').val(data.balance);
+                            } else {
+                                $('#quantityInput').val(''); // Clear the input if no data is found
+                                $('#balanceInput').val('');
+                            }
+                            checkQuantityValidity(); // Validate quantity after filling
+                        },
+                        error: function () {
+                            alert('Error retrieving item-store details');
+                        }
+                    });
+                }
+            });
+
+            //Update balance and validate quantity each time quantity changes
+            $('#quantityInput').on('input', function () {
+                checkQuantityValidity(); // Validate quantity
+
+                var quantity = parseInt($(this).val());
+                var balance = parseInt($('#balanceInput').val());
+
+                if (!isNaN(quantity) && !isNaN(balance) && quantity >= 0 && quantity <= 100) {
+                    $('#balanceInput').val(balance + quantity);
+                }
+            });
+
+            //Handle form submission and validate quantity before saving
+            $('form').on('submit', function (event) {
+                event.preventDefault(); // Prevent form from submitting the default way
+
+                var storeId = $('#storeSelect').val();
+                var itemId = $('#itemSelect').val();
+                var quantity = parseInt($('#quantityInput').val());
+                var balance = parseInt($('#balanceInput').val());
+
+                // Validate quantity before submitting
+                if (isNaN(quantity) || quantity < 0 || quantity > 100) {
+                    alert('Please enter a valid quantity between 0 and 100');
+                    return; // Stop submission if invalid
+                }
+
+                var updatedBalance = balance + quantity;
+
+                $.ajax({
+                    url: '@Url.Action("SaveItemStoreDetails", "Home")', 
+                    type: 'POST',
+                    data: {
+                        storeId: storeId,
+                        itemId: itemId,
+                        quantity: quantity,
+                        balance: updatedBalance
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            alert('Balance updated successfully.');
+                            location.reload()
+                        } 
+                        else {
+                            alert('Error updating balance.');
+                        }
+                    },
+                    error: function () {
+                        alert('Error updating balance.');
+                    }
+                });
+            });
+
+            // Function to validate quantity and enable/disable save button
+            function checkQuantityValidity() {
+                var quantity = parseInt($('#quantityInput').val());
+
+                if (!isNaN(quantity) && quantity >= 0 && quantity <= 100) {
+                    $('input[type="submit"]').prop('disabled', false); // Enable save button
+                } 
+                else {
+                    $('input[type="submit"]').prop('disabled', true); // Disable save button if invalid
+                }
+            }
+        });
+
+
+
+    </script>
+
+}
+
+
+
+@section ValidationScriptSection {
+
+    <partial Name="_ValidationScriptsPartial" />
+
+}
